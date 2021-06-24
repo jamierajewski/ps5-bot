@@ -1,5 +1,7 @@
 from selenium.webdriver import Chrome
+from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
+from fake_useragent import UserAgent, FakeUserAgentError
 import sys
 import json
 import time
@@ -23,8 +25,22 @@ class Site:
         except json.decoder.JSONDecodeError:
             sys.exit("Unable to load {} as JSON".format(credentials))
 
+        # Pick a random UserAgent
+        # Source: https://stackoverflow.com/a/49565254
+        options = Options()
+        # Contacting the primary server seems to continually fail, so catch the exception
+        # and move on
         try:
-            self._driver = Chrome(executable_path=driver_path)
+            ua = UserAgent()
+        except:
+            pass
+        userAgent = ua.random
+        print(userAgent)
+        options.add_argument("user-agent={}".format(userAgent))
+
+        try:
+            self._driver = Chrome(executable_path=driver_path,
+                                  options=options)
         except WebDriverException:
             sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
 
@@ -114,6 +130,7 @@ class Costco(Site):
         self._credentials = self._credentials["costco"]
         self.login()
         self.monitor_stock(self._product_urls[0])
+        self._driver.quit()
 
     def login(self):
         '''Self-explanatory
