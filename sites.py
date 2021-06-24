@@ -80,23 +80,35 @@ class Costco(Site):
 
     # HTML xpaths for elements
 
+    # Language/territory modal
+    _modal_submit = '//*[@id="language-region-set"]'
+
     # Login form
     _login_url = 'https://www.costco.ca/LogonForm'
     _login_email = '//*[@id="logonId"]'
     _login_password = '//*[@id="logonPassword"]'
     _login_submit = '/html/body/div[8]/div[3]/div/div/div/div/form/fieldset/div[6]/input'
 
-    # Product page
-
     def __init__(self, chrome_driver_path, credentials):
         super().__init__(chrome_driver_path, credentials)
         self._credentials = self._credentials["costco"]
+        self._driver.execute_script("document.body.style.zoom='50%';")
         self.login()
 
     def login(self):
         '''Self-explanatory
         '''
         self._driver.get(self._login_url)
+
+        self.clickButton(self._modal_submit)
+
+        # Delete the language/territory modal to speed up
+        # self._driver.execute_script("""
+        # var modal = document.evaluate('/html/body/div[10]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        # modal.parentNode.removeChild(modal);
+        # modal = document.evaluate('/html/body/div[10]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        # modal.parentNode.removeChild(modal);
+        # """)
 
         self.inputText(self._login_email,
                        self._credentials["email"])
