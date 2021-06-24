@@ -31,9 +31,21 @@ class Site:
     def clickButton(self, button_xpath, attempt):
         try:
             self._driver.find_element_by_xpath(button_xpath).click()
+            return True
         # Numerous exceptions could occur here so catch, print and move on
         except:
             print("Could not click element {} - Attempt {}".format(button_xpath, attempt))
+            return False
+
+    def inputText(self, textbox_xpath, text, attempt):
+        try:
+            self._driver.find_element_by_xpath(textbox_xpath).send_keys(text)
+            return True
+        # Numerous exceptions could occur here so catch, print and move on
+        except:
+            print(
+                "Could not send keys to element {} - Attempt {}".format(textbox_xpath, attempt))
+            return False
 
 
 class Costco(Site):
