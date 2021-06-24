@@ -29,23 +29,42 @@ class Site:
             sys.exit("Invalid path to Chrome driver: {}".format(
                 chrome_driver_path))
 
-    def clickButton(self, button_xpath, attempt):
+    def try_action(self, func):
+        '''Wrapper to attempt a given action the predefined number of times
+        '''
+        def retry(*args, **kwargs):
+
+            for attempt in range(1, self._retry_attempts+1):
+                if func(*args, **kwargs):
+                    break
+
+            if attempt > self._retry_attempts:
+                print("{} attempts reached, giving up".format(
+                    self._retry_attempts))
+                return False
+
+            return True
+
+        return retry
+
+    @try_action
+    def clickButton(self, button_xpath):
         try:
             self._driver.find_element_by_xpath(button_xpath).click()
             return True
         # Numerous exceptions could occur here so catch, print and move on
         except:
-            print("Could not click element {} - Attempt {}".format(button_xpath, attempt))
+            print("Could not click element {}".format(button_xpath))
             return False
 
-    def inputText(self, textbox_xpath, text, attempt):
+    @try_action
+    def inputText(self, textbox_xpath, text):
         try:
             self._driver.find_element_by_xpath(textbox_xpath).send_keys(text)
             return True
         # Numerous exceptions could occur here so catch, print and move on
         except:
-            print(
-                "Could not send keys to element {} - Attempt {}".format(textbox_xpath, attempt))
+            print("Could not send keys to element {}".format(textbox_xpath))
             return False
 
 
@@ -75,6 +94,14 @@ class Costco(Site):
         '''Login. Assume billing/shipping details exist on file
         '''
         self._driver.get(self._login_url)
+
+        self.inputText(self._login_email,
+                       self._credentials["email"])
+
+        self.inputText(self._login_password,
+                       self._credentials["password"])
+
+        self.clickButton(self._login_submit)
 
     def in_stock(self):
         '''Continually monitor page until product is in stock
