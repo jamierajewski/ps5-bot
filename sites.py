@@ -29,13 +29,15 @@ class Site:
             sys.exit("Invalid path to Chrome driver: {}".format(
                 chrome_driver_path))
 
-    def try_action(self, func):
+    def try_action(func):
         '''Wrapper to attempt a given action the predefined number of times
         '''
-        def retry(*args, **kwargs):
+
+        def retry(self, *args, **kwargs):
 
             for attempt in range(1, self._retry_attempts+1):
-                if func(*args, **kwargs):
+                print("Attempt {}".format(attempt))
+                if func(self, *args, **kwargs):
                     break
 
             if attempt > self._retry_attempts:
@@ -86,12 +88,13 @@ class Costco(Site):
 
     # Product page
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, chrome_driver_path, credentials):
+        super().__init__(chrome_driver_path, credentials)
         self._credentials = self._credentials["costco"]
+        self.login()
 
     def login(self):
-        '''Login. Assume billing/shipping details exist on file
+        '''Self-explanatory
         '''
         self._driver.get(self._login_url)
 
@@ -111,7 +114,7 @@ class Costco(Site):
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
         '''
-
+        pass
         # Add to cart - The HTML ID is:
         # "add-to-cart-btn"
 
