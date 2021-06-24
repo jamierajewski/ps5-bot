@@ -13,7 +13,7 @@ class Site:
     _retry_action_delay = 0.2
     _retry_attempts = 100
 
-    def __init__(self, chrome_driver_path, credentials):
+    def __init__(self, driver_path, credentials):
 
         try:
             with open(credentials, "r") as json_file:
@@ -24,10 +24,9 @@ class Site:
             sys.exit("Unable to load {} as JSON".format(credentials))
 
         try:
-            self._driver = Chrome(executable_path=chrome_driver_path)
+            self._driver = Chrome(executable_path=driver_path)
         except WebDriverException:
-            sys.exit("Invalid path to Chrome driver: {}".format(
-                chrome_driver_path))
+            sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
 
     def try_action(func):
         '''Wrapper to attempt a given action the predefined number of times
@@ -39,6 +38,7 @@ class Site:
                 print("Attempt {}".format(attempt))
                 if func(self, *args, **kwargs):
                     break
+                time.sleep(self._retry_action_delay)
 
             if attempt > self._retry_attempts:
                 print("{} attempts reached, giving up".format(
@@ -69,6 +69,23 @@ class Site:
             print("Could not send keys to element {}".format(textbox_xpath))
             return False
 
+    def findText(self, text_xpath, text):
+        '''Don't decorate this, as we want to react differently to the
+        text being there or not
+        '''
+        try:
+            element_text = self._driver.find_element_by_xpath(text_xpath).text
+            print("element text: [{}]".format(element_text))
+            if element_text == text:
+                print("Text: {}, element_text: {}, returning true".format(
+                    text, element_text))
+                return True
+            return False
+        # Numerous exceptions could occur here so catch, print and move on
+        except:
+            print("Could not find text at element {}".format(text_xpath))
+            return False
+
 
 class Costco(Site):
     '''costco.ca interface
@@ -89,11 +106,14 @@ class Costco(Site):
     _login_password = '//*[@id="logonPassword"]'
     _login_submit = '/html/body/div[8]/div[3]/div/div/div/div/form/fieldset/div[6]/input'
 
-    def __init__(self, chrome_driver_path, credentials):
-        super().__init__(chrome_driver_path, credentials)
+    # Product page
+    _product_add_to_cart = '//*[@id="add-to-cart-btn"]'
+
+    def __init__(self, driver_path, credentials):
+        super().__init__(driver_path, credentials)
         self._credentials = self._credentials["costco"]
-        self._driver.execute_script("document.body.style.zoom='50%';")
         self.login()
+        self.monitor_stock(self._product_urls[0])
 
     def login(self):
         '''Self-explanatory
@@ -118,17 +138,25 @@ class Costco(Site):
 
         self.clickButton(self._login_submit)
 
-    def in_stock(self):
+    def monitor_stock(self, product_url):
         '''Continually monitor page until product is in stock
         '''
-        pass
+        self._driver.get(product_url)
+
+        while True:
+            # If out of stock, wait _retry_stock-seconds and reload page, try again
+            if self.findText(self._product_add_to_cart, "Add to Cart"):
+                print("In stock!")
+                break
+            else:
+                print("OOS - Retrying in {}s".format(self._retry_stock))
+                time.sleep(self._retry_stock)
+                self._driver.refresh()
 
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
         '''
         pass
-        # Add to cart - The HTML ID is:
-        # "add-to-cart-btn"
 
         # Once added, navigate to cart (optional? Can you skip directly to checkout?)
         # https://www.costco.ca/CheckoutCartView
