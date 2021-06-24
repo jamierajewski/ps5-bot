@@ -2,11 +2,15 @@ from selenium.webdriver import Chrome
 from selenium.common.exceptions import WebDriverException
 import sys
 import json
+import time
 
 
 class Site:
     '''Defines a generic interface to hold site details
     '''
+
+    _retry_delay = 0.2
+    _retry_attempts = 100
 
     def __init__(self, chrome_driver_path, credentials):
 
@@ -24,6 +28,13 @@ class Site:
             sys.exit("Invalid path to Chrome driver: {}".format(
                 chrome_driver_path))
 
+    def clickButton(self, button_xpath, attempt):
+        try:
+            self._driver.find_element_by_xpath(button_xpath).click()
+        # Numerous exceptions could occur here so catch, print and move on
+        except:
+            print("Could not click element {} - Attempt {}".format(button_xpath, attempt))
+
 
 class Costco(Site):
     '''costco.ca interface
@@ -33,22 +44,25 @@ class Costco(Site):
                      "https://www.costco.ca/playstation-5-console-bundle.product.100696941.html"
                      ]
 
+    # HTML xpaths for elements
+
+    # Login form
+    _login_email = '//*[@id="logonId"]'
+    _login_password = '//*[@id="logonPassword"]'
+    _login_submit = '/html/body/div[8]/div[3]/div/div/div/div/form/fieldset/div[6]/input'
+
+    # Product page
+
     def __init__(self):
         super().__init__()
+        self._credentials = self._credentials["costco"]
 
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
         '''
-        pass
 
         # Login
         self._driver.get("https://www.costco.ca/LogonForm")
-        # Email textbox:
-        # //*[@id="logonId"]
-        # Password textbox:
-        # //*[@id="logonPassword"]
-        # Submit button:
-        # /html/body/div[8]/div[3]/div/div/div/div/form/fieldset/div[6]/input
 
         # Add to cart - The HTML ID is:
         # "add-to-cart-btn"
