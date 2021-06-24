@@ -9,7 +9,8 @@ class Site:
     '''Defines a generic interface to hold site details
     '''
 
-    _retry_delay = 0.2
+    _retry_stock = 2
+    _retry_action_delay = 0.2
     _retry_attempts = 100
 
     def __init__(self, chrome_driver_path, credentials):
@@ -59,6 +60,7 @@ class Costco(Site):
     # HTML xpaths for elements
 
     # Login form
+    _login_url = 'https://www.costco.ca/LogonForm'
     _login_email = '//*[@id="logonId"]'
     _login_password = '//*[@id="logonPassword"]'
     _login_submit = '/html/body/div[8]/div[3]/div/div/div/div/form/fieldset/div[6]/input'
@@ -69,12 +71,19 @@ class Costco(Site):
         super().__init__()
         self._credentials = self._credentials["costco"]
 
+    def login(self):
+        '''Login. Assume billing/shipping details exist on file
+        '''
+        self._driver.get(self._login_url)
+
+    def in_stock(self):
+        '''Continually monitor page until product is in stock
+        '''
+        pass
+
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
         '''
-
-        # Login
-        self._driver.get("https://www.costco.ca/LogonForm")
 
         # Add to cart - The HTML ID is:
         # "add-to-cart-btn"
