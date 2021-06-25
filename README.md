@@ -1,5 +1,5 @@
 # ps5-bot
-A bot to buy a PS5
+A bot to buy a PS5.
 
 This is not designed to be a scalper's best friend, but rather a way for individuals to acquire a single system in these hard times. 
 
@@ -33,15 +33,16 @@ Currently works for `costco.ca` as long as you have an account with your informa
     _retry_attempts = 100
     _wait_timeout = 3
 ```
-5. Inside of the repo, run the Python interpreter
-6. Import the `sites.py` module:
+5. There is currently a list of product page URLs in each class as an attribute, where I chose one to run. If you would like a particular bundle/edition, add your own product page URL and make sure the code is choosing it.
+6. Inside of the repo, run the Python interpreter
+7. Import the `sites.py` module:
 
 ```python
 import sites
 ```
-7. Instantiate whichever site's class you want to run, passing the path to the chrome driver and the credentials file:
+8. Instantiate whichever site's class you want to run, passing the path to the chrome driver and the credentials file:
 
 ```python
 site = sites.Costco('./chromedriver', './credentials.json')
 ```
-8. A browser window should open up, and the bot will attempt to buy a PS5. Upon success, the bot will exit.
+9. A browser window should open up, and the bot will attempt to buy a PS5. Upon success, the bot will exit.
