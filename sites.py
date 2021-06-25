@@ -1,6 +1,9 @@
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from fake_useragent import UserAgent, FakeUserAgentError
 import sys
 import json
@@ -11,9 +14,10 @@ class Site:
     '''Defines a generic interface to hold site details
     '''
 
-    _retry_stock = 2
+    _retry_stock = 1
     _retry_action_delay = 0.2
     _retry_attempts = 100
+    _wait_timeout = 3
 
     def __init__(self, driver_path, credentials):
 
@@ -32,7 +36,7 @@ class Site:
         # and move on
         try:
             ua = UserAgent()
-        except:
+        except FakeUserAgentError:
             pass
         userAgent = ua.random
         print(userAgent)
@@ -44,41 +48,22 @@ class Site:
         except WebDriverException:
             sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
 
-    def try_action(func):
-        '''Wrapper to attempt a given action the predefined number of times
-        '''
-
-        def retry(self, *args, **kwargs):
-
-            for attempt in range(1, self._retry_attempts+1):
-                print("Attempt {}".format(attempt))
-                if func(self, *args, **kwargs):
-                    break
-                time.sleep(self._retry_action_delay)
-
-            if attempt > self._retry_attempts:
-                print("{} attempts reached, giving up".format(
-                    self._retry_attempts))
-                return False
-
-            return True
-
-        return retry
-
-    @try_action
     def clickButton(self, button_xpath):
         try:
-            self._driver.find_element_by_xpath(button_xpath).click()
+            # Wait for element to show up before retrieving text
+            # Source: https://stackoverflow.com/a/65861880
+            WebDriverWait(self._driver, self._wait_timeout).until(
+                EC.visibility_of_element_located((By.XPATH, button_xpath))).click()
             return True
         # Numerous exceptions could occur here so catch, print and move on
         except:
             print("Could not click element {}".format(button_xpath))
             return False
 
-    @try_action
     def inputText(self, textbox_xpath, text):
         try:
-            self._driver.find_element_by_xpath(textbox_xpath).send_keys(text)
+            WebDriverWait(self._driver, self._wait_timeout).until(
+                EC.visibility_of_element_located((By.XPATH, textbox_xpath))).send_keys(text)
             return True
         # Numerous exceptions could occur here so catch, print and move on
         except:
@@ -86,15 +71,10 @@ class Site:
             return False
 
     def findText(self, text_xpath, text):
-        '''Don't decorate this, as we want to react differently to the
-        text being there or not
-        '''
         try:
-            element_text = self._driver.find_element_by_xpath(text_xpath).text
-            print("element text: [{}]".format(element_text))
+            element_text = WebDriverWait(self._driver, self._wait_timeout).until(
+                EC.visibility_of_element_located((By.XPATH, text_xpath))).get_attribute("value")
             if element_text == text:
-                print("Text: {}, element_text: {}, returning true".format(
-                    text, element_text))
                 return True
             return False
         # Numerous exceptions could occur here so catch, print and move on
@@ -111,8 +91,6 @@ class Costco(Site):
                      "https://www.costco.ca/playstation-5-console-bundle.product.100696941.html"
                      ]
 
-    # HTML xpaths for elements
-
     # Language/territory modal
     _modal_submit = '//*[@id="language-region-set"]'
 
@@ -125,11 +103,18 @@ class Costco(Site):
     # Product page
     _product_add_to_cart = '//*[@id="add-to-cart-btn"]'
 
+    # Shopping cart
+    _shopping_cart_url = 'https://www.costco.ca/CheckoutCartView'
+
+    # Checkout page
+    _checkout_cvv = '//*[@id="securityCode"]'
+
     def __init__(self, driver_path, credentials):
         super().__init__(driver_path, credentials)
         self._credentials = self._credentials["costco"]
         self.login()
         self.monitor_stock(self._product_urls[0])
+        self.buy()
         self._driver.quit()
 
     def login(self):
@@ -173,16 +158,24 @@ class Costco(Site):
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
         '''
-        pass
+        self.clickButton(self._product_add_to_cart)
 
-        # Once added, navigate to cart (optional? Can you skip directly to checkout?)
-        # https://www.costco.ca/CheckoutCartView
+        # Once added, navigate to cart
+        self._driver.get(self._shopping_cart_url)
 
-        # Click checkout button - HTML ID is:
-        # "shopCartCheckoutSubmitButton"
+        # Skip waiting for the button to appear and just trigger the onClick function directly
+        self._driver.execute_script(
+            "COSTCO.OrderSummaryCart.submitCart('https://www.costco.ca/ManageShoppingCartCmd?actionType=checkout');")
 
-        # Need to fill in CVV if already signed in
+        # Need to fill in CVV since everything else is filled in
+        self.inputText(self._checkout_cvv, self._credentials["cvv"])
 
-        # Shipping
+        # Continue to shipping options
+        self._driver.execute_script(
+            "COSTCO.OrderSummary.checkoutSteps.submitCheckoutStep(2);")
+
+        # Place order
+        self._driver.execute_script(
+            "COSTCO.OrderSummary.checkoutSteps.submitCheckoutStep(3);")
 
         # Confirmation
