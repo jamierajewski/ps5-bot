@@ -48,6 +48,11 @@ class Site:
         except WebDriverException:
             sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
 
+        if type(self) == Site:
+            raise Exception("Cannont execute using Site baseclass")
+
+        self.execute()
+
     def clickButton(self, button_xpath):
         try:
             # Wait for element to show up before retrieving text
@@ -82,6 +87,46 @@ class Site:
             print("Could not find text at element {}".format(text_xpath))
             return False
 
+    def enter_credentials(self):
+        '''
+        Enter login credentials
+        '''
+        self.inputText(self._login_email,
+                       self._credentials["email"])
+
+        self.inputText(self._login_password,
+                       self._credentials["password"])
+
+    def login(self):
+
+        self._driver.get(self._login_url)
+
+        self.enter_credentials()
+
+        self.clickButton(self._login_submit)
+
+    def execute(self):
+        self._credentials = self._credentials[self._site_name]
+        self.login()
+        self.monitor_stock(self._product_urls[0])
+        self.buy()
+        self._driver.quit()
+
+    def monitor_stock(self, product_url):
+        '''Continually monitor page until product is in stock
+        '''
+        self._driver.get(product_url)
+
+        while True:
+            # If out of stock, wait _retry_stock-seconds and reload page, try again
+            if self.findText(self._product_add_to_cart, "Add to cart"):
+                print("In stock!")
+                break
+            else:
+                print("OOS - Retrying in {}s".format(self._retry_stock))
+                time.sleep(self._retry_stock)
+                self._driver.refresh()
+
 
 class Costco(Site):
     '''costco.ca interface
@@ -109,17 +154,18 @@ class Costco(Site):
     # Checkout page
     _checkout_cvv = '//*[@id="securityCode"]'
 
+    _site_name = "costco"
+
     def __init__(self, driver_path, credentials):
         super().__init__(driver_path, credentials)
-        self._credentials = self._credentials["costco"]
-        self.login()
-        self.monitor_stock(self._product_urls[0])
-        self.buy()
-        self._driver.quit()
 
     def login(self):
-        '''Self-explanatory
         '''
+        Self-explanatory
+        
+        Override base method because of the extra button click
+        '''
+        
         self._driver.get(self._login_url)
 
         self.clickButton(self._modal_submit)
@@ -132,28 +178,9 @@ class Costco(Site):
         # modal.parentNode.removeChild(modal);
         # """)
 
-        self.inputText(self._login_email,
-                       self._credentials["email"])
-
-        self.inputText(self._login_password,
-                       self._credentials["password"])
+        self.enter_credentials()
 
         self.clickButton(self._login_submit)
-
-    def monitor_stock(self, product_url):
-        '''Continually monitor page until product is in stock
-        '''
-        self._driver.get(product_url)
-
-        while True:
-            # If out of stock, wait _retry_stock-seconds and reload page, try again
-            if self.findText(self._product_add_to_cart, "Add to Cart"):
-                print("In stock!")
-                break
-            else:
-                print("OOS - Retrying in {}s".format(self._retry_stock))
-                time.sleep(self._retry_stock)
-                self._driver.refresh()
 
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
@@ -205,6 +232,8 @@ class Walmart(Site):
     # Checkout confirmation
     _checkout_submit = '//*[@id="atc-root"]/div[3]/div[2]/button[1]'
 
+    _site_name = "walmart"
+
     # Checkout... second confirmation
     #_proceed_to_checkout = '/html/body/div/div/div/div[3]/div[4]/div[3]/div/div[1]/div[11]/div/a/button'
 
@@ -216,38 +245,6 @@ class Walmart(Site):
 
     def __init__(self, driver_path, credentials):
         super().__init__(driver_path, credentials)
-        self._credentials = self._credentials["walmart"]
-        self.login()
-        self.monitor_stock(self._product_urls[0])
-        self.buy()
-        self._driver.quit()
-
-    def login(self):
-
-        self._driver.get(self._login_url)
-
-        self.inputText(self._login_email,
-                       self._credentials["email"])
-
-        self.inputText(self._login_password,
-                       self._credentials["password"])
-
-        self.clickButton(self._login_submit)
-
-    def monitor_stock(self, product_url):
-        '''Continually monitor page until product is in stock
-        '''
-        self._driver.get(product_url)
-
-        while True:
-            # If out of stock, wait _retry_stock-seconds and reload page, try again
-            if self.findText(self._product_add_to_cart, "Add to cart"):
-                print("In stock!")
-                break
-            else:
-                print("OOS - Retrying in {}s".format(self._retry_stock))
-                time.sleep(self._retry_stock)
-                self._driver.refresh()
 
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
@@ -264,92 +261,6 @@ class Walmart(Site):
         # self.clickButton(self._place_order)
 
         # Confirmation
-
-
-class Walmart(Site):
-    '''walmart.ca interface
-    '''
-
-    _product_urls = ["https://www.walmart.ca/en/ip/playstation-5-console-plus-extra-dualsense-wireless-controller-midnight-black-ratchet-clank-rift-apart-playstation-5/6000194255691",
-                     "https://www.walmart.ca/en/ip/playstation5-console-plus-playstation5-dualsense-wireless-controller-and-ratchet-clank-rift-apart-playstation-5/6000195165106",
-                     "https://www.walmart.ca/en/ip/playstation5-console/6000202198562",
-                     "https://www.walmart.ca/en/ip/playstation-5-console-plus-extra-dualsense-wireless-controller/6000201790922"]
-
-    # Login form
-    _login_url = 'https://www.walmart.ca/sign-in?from=%2Fen'
-    _login_email = '//*[@id="username"]'
-    _login_password = '//*[@id="password"]'
-    _login_submit = '//*[@id="login-form"]/div/div[7]/button'
-
-    # Product page
-    _product_add_to_cart = '/html/body/div[1]/div/div[4]/div/div/div[1]/div[3]/div[2]/div/div[2]/div[2]/div/button[1]'
-
-    # Age confirmation modal
-    _age_modal_submit = '//*[@id="modal-root"]/div/div/div[1]/div/div[1]/div/button[2]'
-
-    # Checkout confirmation
-    _checkout_submit = '//*[@id="atc-root"]/div[3]/div[2]/button[1]'
-
-    # Checkout... second confirmation
-    #_proceed_to_checkout = '/html/body/div/div/div/div[3]/div[4]/div[3]/div/div[1]/div[11]/div/a/button'
-
-    # Confirm shipping
-    #_confirm_shipping = '//*[@id="step2"]/div[2]/div[2]/div/div/div[2]/div[3]/div/div[2]/button'
-
-    # Place order
-    #_place_order = '/html/body/div[1]/div/div/div[1]/div[1]/div[4]/div/div/div/button'
-
-    def __init__(self, driver_path, credentials):
-        super().__init__(driver_path, credentials)
-        self._credentials = self._credentials["walmart"]
-        self.login()
-        self.monitor_stock(self._product_urls[0])
-        self.buy()
-        self._driver.quit()
-
-    def login(self):
-
-        self._driver.get(self._login_url)
-
-        self.inputText(self._login_email,
-                       self._credentials["email"])
-
-        self.inputText(self._login_password,
-                       self._credentials["password"])
-
-        self.clickButton(self._login_submit)
-
-    def monitor_stock(self, product_url):
-        '''Continually monitor page until product is in stock
-        '''
-        self._driver.get(product_url)
-
-        while True:
-            # If out of stock, wait _retry_stock-seconds and reload page, try again
-            if self.findText(self._product_add_to_cart, "Add to cart"):
-                print("In stock!")
-                break
-            else:
-                print("OOS - Retrying in {}s".format(self._retry_stock))
-                time.sleep(self._retry_stock)
-                self._driver.refresh()
-
-    def buy(self):
-        '''Once on a product page, this function will attempt to purchase it
-        '''
-        self.clickButton(self._product_add_to_cart)
-
-        # Pass the age confirmation
-        self.clickButton(self._age_modal_submit)
-
-        # Submit to checkout
-        self.clickButton(self._checkout_submit)
-
-        # Place order
-        # self.clickButton(self._place_order)
-
-        # Confirmation
-
 
 class Bestbuy(Site):
     '''bestbuy.ca interface
@@ -362,6 +273,8 @@ class Bestbuy(Site):
     _login_email = '//*[@id="username"]'
     _login_password = '//*[@id="password"]'
     _login_submit = '//*[@id="signIn"]/div/button'
+
+    _site_name = "bestbuy"
 
     # Product page
     #_product_add_to_cart = '/html/body/div[1]/div/div[4]/div/div/div[1]/div[3]/div[2]/div/div[2]/div[2]/div/button[1]'
@@ -383,38 +296,6 @@ class Bestbuy(Site):
 
     def __init__(self, driver_path, credentials):
         super().__init__(driver_path, credentials)
-        self._credentials = self._credentials["bestbuy"]
-        self.login()
-        # self.monitor_stock(self._product_urls[0])
-        # self.buy()
-        # self._driver.quit()
-
-    def login(self):
-
-        self._driver.get(self._login_url)
-
-        self.inputText(self._login_email,
-                       self._credentials["email"])
-
-        self.inputText(self._login_password,
-                       self._credentials["password"])
-
-        self.clickButton(self._login_submit)
-
-    def monitor_stock(self, product_url):
-        '''Continually monitor page until product is in stock
-        '''
-        self._driver.get(product_url)
-
-        while True:
-            # If out of stock, wait _retry_stock-seconds and reload page, try again
-            if self.findText(self._product_add_to_cart, "Add to cart"):
-                print("In stock!")
-                break
-            else:
-                print("OOS - Retrying in {}s".format(self._retry_stock))
-                time.sleep(self._retry_stock)
-                self._driver.refresh()
 
     def buy(self):
         '''Once on a product page, this function will attempt to purchase it
