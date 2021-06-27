@@ -18,8 +18,6 @@ class Site:
     '''
 
     _retry_stock = 1
-    _retry_action_delay = 0.2
-    _retry_attempts = 100
     _wait_timeout = 3
 
     def __init__(self, driver_path, credentials):
