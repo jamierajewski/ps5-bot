@@ -96,19 +96,19 @@ class Site:
 
         # Setup the MIME
         message = MIMEMultipart()
-        message['From'] = self._credentials["sender_email"]
-        message['To'] = self._credentials["recipient_email"]
+        message['From'] = self._credentials["notifications"]["sender_email"]
+        message['To'] = self._credentials["notifications"]["recipient_email"]
         message['Subject'] = "PS5 Bot - Order Confirmation"
         message.attach(MIMEText(body, 'plain'))
         # Create SMTP session for sending the mail
         session = smtplib.SMTP('smtp.gmail.com', 587)
         session.starttls()
-        session.login(self._credentials["sender_email"],
-                      self._credentials["sender_password"])
+        session.login(self._credentials["notifications"]["sender_email"],
+                      self._credentials["notifications"]["sender_password"])
         text = message.as_string()
         try:
-            session.sendmail(self._credentials["sender_email"],
-                             self._credentials["recipient_email"],
+            session.sendmail(self._credentials["notifications"]["sender_email"],
+                             self._credentials["notifications"]["recipient_email"],
                              text)
             print("Email confirmation sent")
         except smtplib.SMTPException:
@@ -122,10 +122,10 @@ class Site:
         Enter login credentials
         '''
 
-        if not self.inputText(self._login_email, self._credentials["email"]):
+        if not self.inputText(self._login_email, self._site_credentials["email"]):
             self.send_email("Failed to enter email at login")
 
-        if not self.inputText(self._login_password, self._credentials["password"]):
+        if not self.inputText(self._login_password, self._site_credentials["password"]):
             self.send_email("Failed to enter password at login")
 
     def login(self):
@@ -156,7 +156,7 @@ class Site:
                 self._driver.refresh()
 
     def execute(self):
-        self._credentials = self._credentials[self._site_name]
+        self._site_credentials = self._credentials[self._site_name]
         self.login()
         self.monitor_stock(self._product_urls[0])
         # Implemented in each child class
@@ -231,7 +231,7 @@ class Costco(Site):
             "COSTCO.OrderSummaryCart.submitCart('https://www.costco.ca/ManageShoppingCartCmd?actionType=checkout');")
 
         # Need to fill in CVV since everything else is filled in
-        self.inputText(self._checkout_cvv, self._credentials["cvv"])
+        self.inputText(self._checkout_cvv, self._site_credentials["cvv"])
 
         # Continue to shipping options
         self._driver.execute_script(
