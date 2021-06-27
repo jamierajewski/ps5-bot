@@ -44,5 +44,21 @@ import sites
 
 ```python
 site = sites.Costco('./chromedriver', './credentials.json')
+site.launch()
 ```
 9. A browser window should open up, and the bot will attempt to buy a PS5. Upon success, the bot will exit.
+
+10. You can also use the included CLI pointing to a json file containing one of more configurations.
+```json
+{
+    "costco": {
+        "product": "N/A"
+    }
+}
+```
+```
+python3 buy_ps5.py --config /path/to/config.json
+```
+
+This will spawn a browser window for each product under each website. If you wish to only use
+the default url, leave a single entry with the value "N/A", otherswise give the url to the product page.

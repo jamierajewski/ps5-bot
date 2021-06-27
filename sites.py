@@ -21,6 +21,7 @@ class Site:
     _wait_timeout = 3
 
     def __init__(self, driver_path, credentials):
+        self._driver_path = driver_path
 
         try:
             with open(credentials, "r") as json_file:
@@ -32,7 +33,7 @@ class Site:
 
         # Pick a random UserAgent
         # Source: https://stackoverflow.com/a/49565254
-        options = Options()
+        self._options = Options()
         # Contacting the primary server seems to continually fail, so catch the exception
         # and move on
         try:
@@ -40,18 +41,24 @@ class Site:
         except FakeUserAgentError:
             pass
         userAgent = ua.random
-        options.add_argument("user-agent={}".format(userAgent))
+        
+        self._options.add_argument("user-agent={}".format(userAgent))
+
+    def launch(self, product_url: str):
+        if product_url is not None:
+            self._product_urls.insert(0, product_url)
 
         try:
-            self._driver = Chrome(executable_path=driver_path,
-                                  options=options)
+            self._driver = Chrome(executable_path=self._driver_path,
+                                  options=self._options)
         except WebDriverException:
-            sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
+            sys.exit("Invalid path to Chrome driver: {}".format(self._driver_path))
 
         if type(self) == Site:
             raise Exception("Cannot execute using Site baseclass")
 
         self.execute()
+
 
     def clickButton(self, button_xpath):
         try:
