@@ -5,6 +5,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from fake_useragent import UserAgent, FakeUserAgentError
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import sys
 import json
 import time
@@ -15,8 +18,6 @@ class Site:
     '''
 
     _retry_stock = 1
-    _retry_action_delay = 0.2
-    _retry_attempts = 100
     _wait_timeout = 3
 
     def __init__(self, driver_path, credentials):
@@ -40,7 +41,7 @@ class Site:
         except FakeUserAgentError:
             pass
         userAgent = ua.random
-        print(userAgent)
+        
         self._options.add_argument("user-agent={}".format(userAgent))
 
     def launch(self, product_url: str):
@@ -54,7 +55,7 @@ class Site:
             sys.exit("Invalid path to Chrome driver: {}".format(self._driver_path))
 
         if type(self) == Site:
-            raise Exception("Cannont execute using Site baseclass")
+            raise Exception("Cannot execute using Site baseclass")
 
         self.execute()
 
@@ -93,15 +94,44 @@ class Site:
             print("Could not find text at element {}".format(text_xpath))
             return False
 
+    def send_email(self, body):
+        '''Source:
+        https://www.tutorialspoint.com/send-mail-from-your-gmail-account-using-python
+        '''
+
+        # Setup the MIME
+        message = MIMEMultipart()
+        message['From'] = self._credentials["notifications"]["sender_email"]
+        message['To'] = self._credentials["notifications"]["recipient_email"]
+        message['Subject'] = "PS5 Bot - Order Confirmation"
+        message.attach(MIMEText(body, 'plain'))
+        # Create SMTP session for sending the mail
+        session = smtplib.SMTP('smtp.gmail.com', 587)
+        session.starttls()
+        session.login(self._credentials["notifications"]["sender_email"],
+                      self._credentials["notifications"]["sender_password"])
+        text = message.as_string()
+        try:
+            session.sendmail(self._credentials["notifications"]["sender_email"],
+                             self._credentials["notifications"]["recipient_email"],
+                             text)
+            print("Email confirmation sent")
+        except smtplib.SMTPException:
+            # No point in exiting the program here since it ends after this anyways
+            print("Failed to send email confirmation")
+        finally:
+            session.quit()
+
     def enter_credentials(self):
         '''
         Enter login credentials
         '''
-        self.inputText(self._login_email,
-                       self._credentials["email"])
 
-        self.inputText(self._login_password,
-                       self._credentials["password"])
+        if not self.inputText(self._login_email, self._site_credentials["email"]):
+            self.send_email("Failed to enter email at login")
+
+        if not self.inputText(self._login_password, self._site_credentials["password"]):
+            self.send_email("Failed to enter password at login")
 
     def login(self):
 
@@ -109,14 +139,8 @@ class Site:
 
         self.enter_credentials()
 
-        self.clickButton(self._login_submit)
-
-    def execute(self):
-        self._credentials = self._credentials[self._site_name]
-        self.login()
-        self.monitor_stock(self._product_urls[0])
-        self.buy()
-        self._driver.quit()
+        if not self.clickButton(self._login_submit):
+            self.send_email("Failed to click login button")
 
     def monitor_stock(self, product_url):
         '''Continually monitor page until product is in stock
@@ -126,12 +150,23 @@ class Site:
         while True:
             # If out of stock, wait _retry_stock-seconds and reload page, try again
             if self.findText(self._product_add_to_cart, "Add to cart"):
+                # DEBUG
+                self.send_email(
+                    "Product actually in stock, attempting to buy!")
                 print("In stock!")
                 break
             else:
                 print("OOS - Retrying in {}s".format(self._retry_stock))
                 time.sleep(self._retry_stock)
                 self._driver.refresh()
+
+    def execute(self):
+        self._site_credentials = self._credentials[self._site_name]
+        self.login()
+        self.monitor_stock(self._product_urls[0])
+        # Implemented in each child class
+        self.buy()
+        self._driver.quit()
 
 
 class Costco(Site):
@@ -168,10 +203,10 @@ class Costco(Site):
     def login(self):
         '''
         Self-explanatory
-        
+
         Override base method because of the extra button click
         '''
-        
+
         self._driver.get(self._login_url)
 
         self.clickButton(self._modal_submit)
@@ -201,7 +236,7 @@ class Costco(Site):
             "COSTCO.OrderSummaryCart.submitCart('https://www.costco.ca/ManageShoppingCartCmd?actionType=checkout');")
 
         # Need to fill in CVV since everything else is filled in
-        self.inputText(self._checkout_cvv, self._credentials["cvv"])
+        self.inputText(self._checkout_cvv, self._site_credentials["cvv"])
 
         # Continue to shipping options
         self._driver.execute_script(
@@ -211,7 +246,10 @@ class Costco(Site):
         self._driver.execute_script(
             "COSTCO.OrderSummary.checkoutSteps.submitCheckoutStep(3);")
 
-        # Confirmation
+        self.send_email("""This is an automated confirmation that the product at {} was purchased successfully.
+        
+        Please verify that the product was indeed purchased successfully; if not, please submit an issue on the repo.
+        """)
 
 
 class Walmart(Site):
@@ -267,6 +305,7 @@ class Walmart(Site):
         # self.clickButton(self._place_order)
 
         # Confirmation
+
 
 class Bestbuy(Site):
     '''bestbuy.ca interface
