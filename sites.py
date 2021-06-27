@@ -42,7 +42,6 @@ class Site:
         except FakeUserAgentError:
             pass
         userAgent = ua.random
-        print(userAgent)
         options.add_argument("user-agent={}".format(userAgent))
 
         try:
@@ -52,7 +51,7 @@ class Site:
             sys.exit("Invalid path to Chrome driver: {}".format(driver_path))
 
         if type(self) == Site:
-            raise Exception("Cannont execute using Site baseclass")
+            raise Exception("Cannot execute using Site baseclass")
 
         self.execute()
 
@@ -90,56 +89,10 @@ class Site:
             print("Could not find text at element {}".format(text_xpath))
             return False
 
-    def enter_credentials(self):
-        '''
-        Enter login credentials
-        '''
-        self.inputText(self._login_email,
-                       self._credentials["email"])
-
-        self.inputText(self._login_password,
-                       self._credentials["password"])
-
-    def login(self):
-
-        self._driver.get(self._login_url)
-
-        self.enter_credentials()
-
-        self.clickButton(self._login_submit)
-
-    def execute(self):
-        self._credentials = self._credentials[self._site_name]
-        self.login()
-        self.monitor_stock(self._product_urls[0])
-        self.buy()
-        self._driver.quit()
-
-    def monitor_stock(self, product_url):
-        '''Continually monitor page until product is in stock
-        '''
-        self._driver.get(product_url)
-
-        while True:
-            # If out of stock, wait _retry_stock-seconds and reload page, try again
-            if self.findText(self._product_add_to_cart, "Add to cart"):
-                print("In stock!")
-                break
-            else:
-                print("OOS - Retrying in {}s".format(self._retry_stock))
-                time.sleep(self._retry_stock)
-                self._driver.refresh()
-
-    def send_email(self, product_url):
+    def send_email(self, body):
         '''Source:
         https://www.tutorialspoint.com/send-mail-from-your-gmail-account-using-python
         '''
-
-        body = '''Hello,
-        This is an automated confirmation that an order was placed at {} for this product: {}
-
-        Please verify that your order was indeed correctly placed. If not, please open an issue.
-        '''.format(self._site_name, product_url)
 
         # Setup the MIME
         message = MIMEMultipart()
@@ -163,6 +116,52 @@ class Site:
             print("Failed to send email confirmation")
         finally:
             session.quit()
+
+    def enter_credentials(self):
+        '''
+        Enter login credentials
+        '''
+
+        if not self.inputText(self._login_email, self._credentials["email"]):
+            self.send_email("Failed to enter email at login")
+
+        if not self.inputText(self._login_password, self._credentials["password"]):
+            self.send_email("Failed to enter password at login")
+
+    def login(self):
+
+        self._driver.get(self._login_url)
+
+        self.enter_credentials()
+
+        if not self.clickButton(self._login_submit):
+            self.send_email("Failed to click login button")
+
+    def monitor_stock(self, product_url):
+        '''Continually monitor page until product is in stock
+        '''
+        self._driver.get(product_url)
+
+        while True:
+            # If out of stock, wait _retry_stock-seconds and reload page, try again
+            if self.findText(self._product_add_to_cart, "Add to cart"):
+                # DEBUG
+                self.send_email(
+                    "Product actually in stock, attempting to buy!")
+                print("In stock!")
+                break
+            else:
+                print("OOS - Retrying in {}s".format(self._retry_stock))
+                time.sleep(self._retry_stock)
+                self._driver.refresh()
+
+    def execute(self):
+        self._credentials = self._credentials[self._site_name]
+        self.login()
+        self.monitor_stock(self._product_urls[0])
+        # Implemented in each child class
+        self.buy()
+        self._driver.quit()
 
 
 class Costco(Site):
@@ -242,7 +241,10 @@ class Costco(Site):
         self._driver.execute_script(
             "COSTCO.OrderSummary.checkoutSteps.submitCheckoutStep(3);")
 
-        # Confirmation
+        self.send_email("""This is an automated confirmation that the product at {} was purchased successfully.
+        
+        Please verify that the product was indeed purchased successfully; if not, please submit an issue on the repo.
+        """)
 
 
 class Walmart(Site):
