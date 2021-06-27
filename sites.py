@@ -5,6 +5,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from fake_useragent import UserAgent, FakeUserAgentError
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import sys
 import json
 import time
@@ -127,6 +130,40 @@ class Site:
                 time.sleep(self._retry_stock)
                 self._driver.refresh()
 
+    def send_email(self, product_url):
+        '''Source:
+        https://www.tutorialspoint.com/send-mail-from-your-gmail-account-using-python
+        '''
+
+        body = '''Hello,
+        This is an automated confirmation that an order was placed at {} for this product: {}
+
+        Please verify that your order was indeed correctly placed. If not, please open an issue.
+        '''.format(self._site_name, product_url)
+
+        # Setup the MIME
+        message = MIMEMultipart()
+        message['From'] = self._credentials["sender_email"]
+        message['To'] = self._credentials["recipient_email"]
+        message['Subject'] = "PS5 Bot - Order Confirmation"
+        message.attach(MIMEText(body, 'plain'))
+        # Create SMTP session for sending the mail
+        session = smtplib.SMTP('smtp.gmail.com', 587)
+        session.starttls()
+        session.login(self._credentials["sender_email"],
+                      self._credentials["sender_password"])
+        text = message.as_string()
+        try:
+            session.sendmail(self._credentials["sender_email"],
+                             self._credentials["recipient_email"],
+                             text)
+            print("Email confirmation sent")
+        except smtplib.SMTPException:
+            # No point in exiting the program here since it ends after this anyways
+            print("Failed to send email confirmation")
+        finally:
+            session.quit()
+
 
 class Costco(Site):
     '''costco.ca interface
@@ -162,10 +199,10 @@ class Costco(Site):
     def login(self):
         '''
         Self-explanatory
-        
+
         Override base method because of the extra button click
         '''
-        
+
         self._driver.get(self._login_url)
 
         self.clickButton(self._modal_submit)
@@ -261,6 +298,7 @@ class Walmart(Site):
         # self.clickButton(self._place_order)
 
         # Confirmation
+
 
 class Bestbuy(Site):
     '''bestbuy.ca interface
